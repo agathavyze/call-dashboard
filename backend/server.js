@@ -60,6 +60,20 @@ if (!adminExists) {
   console.log('Created default admin user (password: ' + ADMIN_PASSWORD + ')')
 }
 
+// Create seed users from environment (format: USER_SEED_1=username:password:role)
+for (let i = 1; i <= 10; i++) {
+  const seed = process.env[`USER_SEED_${i}`]
+  if (seed) {
+    const [username, password, role = 'admin'] = seed.split(':')
+    const exists = db.prepare('SELECT id FROM users WHERE username = ?').get(username)
+    if (!exists && username && password) {
+      const hash = bcrypt.hashSync(password, 10)
+      db.prepare('INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)').run(username, null, hash, role)
+      console.log(`Created seed user: ${username} (${role})`)
+    }
+  }
+}
+
 // Session management
 function createSession(userId) {
   const token = crypto.randomBytes(32).toString('hex')
