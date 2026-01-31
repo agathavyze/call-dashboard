@@ -10,7 +10,9 @@ import {
   Users, PhoneCall, PhoneMissed, ChevronDown,
   ChevronUp, X, Lock, Eye, EyeOff, BarChart3, Table, Settings,
   Map, Calendar, Save, FileText, Sun, Moon, Loader2, CheckCircle,
-  AlertCircle, Bookmark, Trash2, Building2, ExternalLink
+  AlertCircle, Bookmark, Trash2, Building2, ExternalLink, MessageSquare,
+  Send, Database, FolderOpen, Plus, RefreshCw, Zap, Brain, Sparkles,
+  FileUp, HardDrive, Columns, AlertTriangle, Activity
 } from 'lucide-react'
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
 import { format, parse, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
@@ -18,7 +20,8 @@ import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import 'leaflet/dist/leaflet.css'
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+const COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+const BRAND_COLOR = '#6366f1' // Indigo
 
 // Search categories
 const SEARCH_CATEGORIES = {
@@ -42,6 +45,23 @@ function useDarkMode() {
   }, [dark])
 
   return [dark, setDark]
+}
+
+// Logo Component
+function Logo({ size = 'md' }) {
+  const sizes = { sm: 'w-6 h-6', md: 'w-8 h-8', lg: 'w-12 h-12' }
+  const textSizes = { sm: 'text-lg', md: 'text-xl', lg: 'text-3xl' }
+  
+  return (
+    <div className="flex items-center gap-2">
+      <div className={`${sizes[size]} bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg`}>
+        <Activity className={`${size === 'lg' ? 'w-7 h-7' : 'w-5 h-5'} text-white`} />
+      </div>
+      <span className={`${textSizes[size]} font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent`}>
+        CallPulse
+      </span>
+    </div>
+  )
 }
 
 // Smart Search Component
@@ -105,7 +125,7 @@ function SmartSearch({ data, onSearch, onSelect }) {
           onFocus={() => query.length >= 2 && setIsOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder="Search phones, names, locations..."
-          className="pl-9 pr-8 py-2 w-80 bg-slate-100 dark:bg-slate-700 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="pl-9 pr-8 py-2 w-80 bg-slate-100 dark:bg-slate-700 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
         {query && (
           <button onClick={() => { setQuery(''); onSearch('') }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
@@ -127,7 +147,7 @@ function SmartSearch({ data, onSearch, onSelect }) {
                 </div>
                 {items.map((item, i) => (
                   <button key={i} onClick={() => handleSelect(catKey, item)}
-                    className="w-full px-4 py-2 text-left hover:bg-blue-50 dark:hover:bg-slate-700 flex items-center justify-between">
+                    className="w-full px-4 py-2 text-left hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center justify-between">
                     <span className="text-sm text-slate-700 dark:text-slate-300">
                       <HighlightMatch text={item.value} query={query} />
                     </span>
@@ -194,14 +214,14 @@ function LoginScreen({ onLogin }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-      <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 w-full max-w-md border border-white/20 shadow-2xl">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
+      <div className="relative bg-white/10 backdrop-blur-lg rounded-2xl p-8 w-full max-w-md border border-white/20 shadow-2xl">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Lock className="w-8 h-8 text-blue-400" />
+          <div className="flex justify-center mb-4">
+            <Logo size="lg" />
           </div>
-          <h1 className="text-2xl font-bold text-white">Call Dashboard</h1>
-          <p className="text-slate-400 mt-2">Sign in to continue</p>
+          <p className="text-slate-400 mt-2">Call Center Analytics Dashboard</p>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
@@ -210,7 +230,7 @@ function LoginScreen({ onLogin }) {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Username"
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <div className="relative">
@@ -219,19 +239,478 @@ function LoginScreen({ onLogin }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
               {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
             </button>
           </div>
           {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
-          <button type="submit" disabled={loading} className="w-full mt-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
+          <button type="submit" disabled={loading} className="w-full mt-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2 shadow-lg">
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            Access Dashboard
+            Sign In
           </button>
         </form>
       </div>
+    </div>
+  )
+}
+
+// AI Chat Panel
+function AIChatPanel({ data, columns }) {
+  const [messages, setMessages] = useState([
+    { role: 'assistant', content: 'Hi! I\'m your AI assistant for CallPulse. Ask me anything about your call data - like "What\'s the busiest time of day?" or "Show me all calls from California".' }
+  ])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const messagesEndRef = useRef(null)
+  const token = localStorage.getItem('auth_token')
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  useEffect(scrollToBottom, [messages])
+
+  const sendMessage = async (e) => {
+    e?.preventDefault()
+    if (!input.trim() || loading) return
+
+    const userMessage = input.trim()
+    setInput('')
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ message: userMessage })
+      })
+      const data = await res.json()
+      
+      if (res.ok) {
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: data.response,
+          filters: data.suggestedFilters
+        }])
+      } else {
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: data.error || 'Sorry, I encountered an error. Please try again.',
+          isError: true
+        }])
+      }
+    } catch (err) {
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Connection error. Please check your internet connection.',
+        isError: true
+      }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const suggestedQueries = [
+    "What's the busiest time of day?",
+    "Show me calls from California",
+    "Average call duration by state",
+    "Who are the top repeat callers?"
+  ]
+
+  if (!expanded) {
+    return (
+      <button
+        onClick={() => setExpanded(true)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform z-50"
+      >
+        <Sparkles className="w-6 h-6 text-white" />
+      </button>
+    )
+  }
+
+  return (
+    <div className="fixed bottom-6 right-6 w-96 h-[500px] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 border border-slate-200 dark:border-slate-700">
+      {/* Header */}
+      <div className="px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Brain className="w-5 h-5" />
+          <span className="font-semibold">AI Assistant</span>
+        </div>
+        <button onClick={() => setExpanded(false)} className="hover:bg-white/20 p-1 rounded">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] rounded-2xl px-4 py-2 ${
+              msg.role === 'user' 
+                ? 'bg-indigo-600 text-white' 
+                : msg.isError 
+                  ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200'
+            }`}>
+              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+              {msg.filters && (
+                <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-600">
+                  <p className="text-xs opacity-70">Suggested filter:</p>
+                  <code className="text-xs">{JSON.stringify(msg.filters)}</code>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div className="flex justify-start">
+            <div className="bg-slate-100 dark:bg-slate-700 rounded-2xl px-4 py-3">
+              <div className="flex gap-1">
+                <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Suggestions */}
+      {messages.length === 1 && (
+        <div className="px-4 pb-2">
+          <p className="text-xs text-slate-500 mb-2">Try asking:</p>
+          <div className="flex flex-wrap gap-1">
+            {suggestedQueries.map((q, i) => (
+              <button key={i} onClick={() => setInput(q)}
+                className="text-xs px-2 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/50">
+                {q}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Input */}
+      <form onSubmit={sendMessage} className="p-4 border-t border-slate-200 dark:border-slate-700">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask about your call data..."
+            className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          <button
+            type="submit"
+            disabled={loading || !input.trim()}
+            className="w-10 h-10 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-full flex items-center justify-center text-white"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+// Data Files Panel
+function DataFilesPanel({ onDataUpdate }) {
+  const [files, setFiles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [uploadResult, setUploadResult] = useState(null)
+  const [showInactive, setShowInactive] = useState(false)
+  const fileInputRef = useRef(null)
+  const token = localStorage.getItem('auth_token')
+  const headers = { 'Authorization': `Bearer ${token}` }
+
+  useEffect(() => { loadFiles() }, [])
+
+  const loadFiles = async () => {
+    try {
+      const res = await fetch('/api/files', { headers })
+      if (res.ok) {
+        const data = await res.json()
+        setFiles(data.files)
+      }
+    } catch (err) {
+      console.error('Failed to load files:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    setUploadResult(null)
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const res = await fetch('/api/files/upload', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      })
+      const data = await res.json()
+      
+      if (res.ok) {
+        setUploadResult({
+          success: true,
+          file: data.file,
+          schema: data.schema
+        })
+        loadFiles()
+        onDataUpdate?.()
+      } else {
+        setUploadResult({ success: false, error: data.error })
+      }
+    } catch (err) {
+      setUploadResult({ success: false, error: err.message })
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleDelete = async (id) => {
+    if (!confirm('Are you sure you want to remove this file from the dataset?')) return
+    
+    try {
+      const res = await fetch(`/api/files/${id}`, {
+        method: 'DELETE',
+        headers
+      })
+      if (res.ok) {
+        loadFiles()
+        onDataUpdate?.()
+      }
+    } catch (err) {
+      console.error('Failed to delete file:', err)
+    }
+  }
+
+  const handleRestore = async (id) => {
+    try {
+      const res = await fetch(`/api/files/${id}/restore`, {
+        method: 'PUT',
+        headers
+      })
+      if (res.ok) {
+        loadFiles()
+        onDataUpdate?.()
+      }
+    } catch (err) {
+      console.error('Failed to restore file:', err)
+    }
+  }
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '-'
+    if (bytes < 1024) return bytes + ' B'
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  }
+
+  const activeFiles = files.filter(f => f.active)
+  const inactiveFiles = files.filter(f => !f.active)
+  const totalRows = activeFiles.reduce((sum, f) => sum + (f.row_count || 0), 0)
+
+  return (
+    <div className="space-y-6">
+      {/* Upload Section */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+            <FileUp className="w-5 h-5 text-indigo-600" />
+            Upload Data File
+          </h3>
+        </div>
+
+        <div
+          onClick={() => !uploading && fileInputRef.current?.click()}
+          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
+            ${uploading ? 'border-indigo-300 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10'}`}
+        >
+          {uploading ? (
+            <div className="flex flex-col items-center">
+              <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-3" />
+              <p className="text-slate-600 dark:text-slate-300">Uploading and analyzing file...</p>
+            </div>
+          ) : (
+            <>
+              <Upload className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+              <p className="text-slate-600 dark:text-slate-300">Drag & drop a CSV/TSV file or click to browse</p>
+              <p className="text-sm text-slate-400 mt-1">Files will be merged with existing data</p>
+            </>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.tsv,.txt"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+        </div>
+
+        {/* Upload Result */}
+        {uploadResult && (
+          <div className={`mt-4 p-4 rounded-lg ${uploadResult.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'}`}>
+            {uploadResult.success ? (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <span className="font-medium text-green-700 dark:text-green-400">File uploaded successfully!</span>
+                </div>
+                <p className="text-sm text-green-600 dark:text-green-400">
+                  {uploadResult.file.original_name} • {uploadResult.file.row_count.toLocaleString()} rows • {uploadResult.file.columns.length} columns
+                </p>
+                
+                {uploadResult.schema?.hasChanges && (
+                  <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-800">
+                    <p className="text-sm font-medium text-green-700 dark:text-green-400 mb-2 flex items-center gap-1">
+                      <Columns className="w-4 h-4" /> Schema Changes Detected
+                    </p>
+                    {uploadResult.schema.newColumns.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-xs text-green-600">New columns added:</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {uploadResult.schema.newColumns.map(col => (
+                            <span key={col} className="text-xs px-2 py-0.5 bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 rounded">
+                              + {col}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {uploadResult.schema.missingColumns.length > 0 && (
+                      <div>
+                        <p className="text-xs text-amber-600">Columns not in this file (will be null):</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {uploadResult.schema.missingColumns.slice(0, 10).map(col => (
+                            <span key={col} className="text-xs px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded">
+                              {col}
+                            </span>
+                          ))}
+                          {uploadResult.schema.missingColumns.length > 10 && (
+                            <span className="text-xs text-amber-600">+{uploadResult.schema.missingColumns.length - 10} more</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+                <span className="text-red-700 dark:text-red-400">{uploadResult.error}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Active Files */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+            <Database className="w-5 h-5 text-indigo-600" />
+            Active Data Sources
+            <span className="text-sm font-normal text-slate-500">({totalRows.toLocaleString()} total rows)</span>
+          </h3>
+          <button onClick={loadFiles} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
+            <RefreshCw className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+          </div>
+        ) : activeFiles.length === 0 ? (
+          <div className="text-center py-8">
+            <FolderOpen className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+            <p className="text-slate-500">No data files uploaded yet</p>
+            <p className="text-sm text-slate-400">Upload a CSV or TSV file to get started</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {activeFiles.map(file => (
+              <div key={file.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-900 dark:text-white">{file.original_name}</p>
+                    <div className="flex items-center gap-3 text-xs text-slate-500">
+                      <span>{file.row_count?.toLocaleString()} rows</span>
+                      <span>•</span>
+                      <span>{JSON.parse(file.columns || '[]').length} columns</span>
+                      <span>•</span>
+                      <span>{formatFileSize(file.file_size)}</span>
+                      {file.date_range_start && (
+                        <>
+                          <span>•</span>
+                          <span>{file.date_range_start} to {file.date_range_end}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => handleDelete(file.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Inactive Files */}
+      {inactiveFiles.length > 0 && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
+          <button
+            onClick={() => setShowInactive(!showInactive)}
+            className="flex items-center justify-between w-full"
+          >
+            <h3 className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+              <HardDrive className="w-5 h-5 text-slate-400" />
+              Removed Files ({inactiveFiles.length})
+            </h3>
+            <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${showInactive ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {showInactive && (
+            <div className="mt-4 space-y-2">
+              {inactiveFiles.map(file => (
+                <div key={file.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/30 rounded-lg opacity-60">
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-5 h-5 text-slate-400" />
+                    <div>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{file.original_name}</p>
+                      <p className="text-xs text-slate-400">{file.row_count?.toLocaleString()} rows</p>
+                    </div>
+                  </div>
+                  <button onClick={() => handleRestore(file.id)} className="text-xs px-3 py-1 bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 rounded hover:bg-slate-300 dark:hover:bg-slate-500">
+                    Restore
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -323,7 +802,7 @@ function DataTable({ data, columns, filters, setFilters }) {
 
       {/* Toggle Charts */}
       <div className="flex justify-end">
-        <button onClick={() => setShowCharts(!showCharts)} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+        <button onClick={() => setShowCharts(!showCharts)} className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
           <BarChart3 className="w-4 h-4" /> {showCharts ? 'Hide Charts' : 'Show Charts'}
         </button>
       </div>
@@ -352,7 +831,7 @@ function DataTable({ data, columns, filters, setFilters }) {
                 <XAxis type="number" hide />
                 <YAxis dataKey="state" type="category" width={30} tick={{ fontSize: 10 }} />
                 <Tooltip />
-                <Bar dataKey="count" fill="#10b981" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="count" fill="#22c55e" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -390,7 +869,7 @@ function DataTable({ data, columns, filters, setFilters }) {
         <div className="p-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <Table className="w-5 h-5" />
+              <Table className="w-5 h-5 text-indigo-600" />
               Call Records ({data.length.toLocaleString()} results)
             </h3>
             <button onClick={() => setExpandedFilters(!expandedFilters)}
@@ -401,11 +880,11 @@ function DataTable({ data, columns, filters, setFilters }) {
           
           {expandedFilters && (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-              {columns.slice(0, 12).map(col => (
+              {columns.filter(c => !c.startsWith('_')).slice(0, 12).map(col => (
                 <div key={col}>
                   <label className="block text-xs text-slate-500 mb-1 truncate">{col}</label>
                   <input type="text" value={filters[col] || ''} onChange={(e) => setFilters(prev => ({ ...prev, [col]: e.target.value }))}
-                    placeholder="Filter..." className="w-full px-2 py-1.5 text-sm bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                    placeholder="Filter..." className="w-full px-2 py-1.5 text-sm bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500" />
                 </div>
               ))}
               <div className="col-span-full flex justify-end">
@@ -419,7 +898,7 @@ function DataTable({ data, columns, filters, setFilters }) {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-700/50">
               <tr>
-                {columns.map(col => (
+                {columns.filter(c => !c.startsWith('_')).map(col => (
                   <th key={col} onClick={() => setSortConfig(prev => ({ key: col, direction: prev.key === col && prev.direction === 'asc' ? 'desc' : 'asc' }))}
                     className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 whitespace-nowrap">
                     <div className="flex items-center gap-1">
@@ -433,13 +912,13 @@ function DataTable({ data, columns, filters, setFilters }) {
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
               {paginatedData.map((row, i) => (
                 <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                  {columns.map(col => {
+                  {columns.filter(c => !c.startsWith('_')).map(col => {
                     const val = row[col]
-                    const isLink = val && (col.includes('Link') || col.includes('URL')) && val.startsWith('http')
+                    const isLink = val && (col.includes('Link') || col.includes('URL')) && String(val).startsWith('http')
                     return (
                       <td key={col} className="px-4 py-3 text-slate-700 dark:text-slate-300 whitespace-nowrap">
                         {isLink ? (
-                          <a href={val} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
+                          <a href={val} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1">
                             Open <ExternalLink className="w-3 h-3" />
                           </a>
                         ) : (val || '-')}
@@ -469,7 +948,7 @@ function DataTable({ data, columns, filters, setFilters }) {
 // Stat Card
 function StatCard({ title, value, subtitle, icon: Icon, color = 'blue' }) {
   const colors = {
-    blue: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    blue: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
     green: 'bg-green-500/10 text-green-600 dark:text-green-400',
     amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
     red: 'bg-red-500/10 text-red-600 dark:text-red-400',
@@ -517,7 +996,7 @@ function MapView({ data }) {
     return (
       <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-2 mb-4">
-          <Map className="w-5 h-5 text-blue-600" />
+          <Map className="w-5 h-5 text-indigo-600" />
           <h3 className="font-semibold text-slate-900 dark:text-white">Call Locations</h3>
         </div>
         <div className="h-96 flex items-center justify-center bg-slate-100 dark:bg-slate-700 rounded-lg">
@@ -534,7 +1013,7 @@ function MapView({ data }) {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
       <div className="flex items-center gap-2 mb-4">
-        <Map className="w-5 h-5 text-blue-600" />
+        <Map className="w-5 h-5 text-indigo-600" />
         <h3 className="font-semibold text-slate-900 dark:text-white">Call Locations ({geoData.length} mapped)</h3>
       </div>
       <div className="h-96 rounded-lg overflow-hidden">
@@ -542,7 +1021,7 @@ function MapView({ data }) {
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
           {aggregated.map((point, i) => (
             <CircleMarker key={i} center={[point.lat, point.lng]} radius={Math.min(20, 5 + point.count / 2)}
-              pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.6 }}>
+              pathOptions={{ color: '#6366f1', fillColor: '#6366f1', fillOpacity: 0.6 }}>
               <Popup>
                 <strong>{point.city}, {point.state}</strong><br />
                 {point.count} calls
@@ -600,7 +1079,7 @@ function DateRangeFilter({ data, onFilter }) {
         <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} min={dateRange.min} max={dateRange.max}
           className="px-2 py-1 text-sm bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded" />
       </div>
-      <button onClick={applyFilter} className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Apply</button>
+      <button onClick={applyFilter} className="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700">Apply</button>
       {(startDate || endDate) && <button onClick={clearFilter} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>}
     </div>
   )
@@ -678,46 +1157,6 @@ function SavedFilters({ filters, globalSearch, dateRange, onLoad, onDelete }) {
           <button onClick={() => setShowSave(false)} className="text-slate-400"><X className="w-4 h-4" /></button>
         </div>
       )}
-    </div>
-  )
-}
-
-// CSV Upload
-function CSVUpload({ onUpload }) {
-  const [dragging, setDragging] = useState(false)
-  const fileRef = useRef(null)
-
-  const handleFile = (file) => {
-    if (!file || !file.name.endsWith('.csv')) return
-    
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        onUpload(results.data, results.meta.fields)
-      }
-    })
-  }
-
-  const handleDrop = (e) => {
-    e.preventDefault()
-    setDragging(false)
-    handleFile(e.dataTransfer.files[0])
-  }
-
-  return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={handleDrop}
-      onClick={() => fileRef.current?.click()}
-      className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-        ${dragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-blue-400'}`}
-    >
-      <Upload className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-      <p className="text-slate-600 dark:text-slate-300">Drag & drop a CSV file or click to browse</p>
-      <p className="text-sm text-slate-400 mt-1">This will replace the current data</p>
-      <input ref={fileRef} type="file" accept=".csv" onChange={(e) => handleFile(e.target.files?.[0])} className="hidden" />
     </div>
   )
 }
@@ -837,11 +1276,11 @@ function AdminPanel({ currentUser }) {
       <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border">
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-            <Users className="w-5 h-5" /> User Management
+            <Users className="w-5 h-5 text-indigo-600" /> User Management
           </h3>
           <button onClick={() => { setShowAdd(true); setEditUser(null); setForm({ username: '', email: '', password: '', role: 'user' }) }}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg flex items-center gap-2">
-            <Users className="w-4 h-4" /> Add User
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Add User
           </button>
         </div>
 
@@ -872,7 +1311,7 @@ function AdminPanel({ currentUser }) {
         )}
 
         {loading ? (
-          <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>
+          <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -906,7 +1345,7 @@ function AdminPanel({ currentUser }) {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
-                        <button onClick={() => startEdit(user)} className="text-blue-600 hover:text-blue-800 text-xs">Edit</button>
+                        <button onClick={() => startEdit(user)} className="text-indigo-600 hover:text-indigo-800 text-xs">Edit</button>
                         <button onClick={() => toggleActive(user)} className="text-amber-600 hover:text-amber-800 text-xs">
                           {user.active ? 'Disable' : 'Enable'}
                         </button>
@@ -963,15 +1402,18 @@ function EnrichmentPanel({ data, onDataUpdate }) {
   return (
     <div className="space-y-6">
       <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-        <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Data Enrichment</h3>
+        <h3 className="font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+          <Zap className="w-5 h-5 text-indigo-600" />
+          Data Enrichment
+        </h3>
         <p className="text-slate-500 mb-6">Processing {data.length.toLocaleString()} records.</p>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {options.map(opt => (
             <div key={opt.id} className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-blue-500/10 rounded-lg">
-                  <opt.icon className="w-5 h-5 text-blue-600" />
+                <div className="p-2 bg-indigo-500/10 rounded-lg">
+                  <opt.icon className="w-5 h-5 text-indigo-600" />
                 </div>
                 <div className="flex-1">
                   <h4 className="font-medium text-slate-900 dark:text-white">{opt.title}</h4>
@@ -985,7 +1427,7 @@ function EnrichmentPanel({ data, onDataUpdate }) {
                   )}
                   
                   <button onClick={() => runEnrichment(opt.id)} disabled={loading[opt.id]}
-                    className="mt-3 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 flex items-center gap-2">
+                    className="mt-3 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50 flex items-center gap-2">
                     {loading[opt.id] && <Loader2 className="w-4 h-4 animate-spin" />}
                     {loading[opt.id] ? 'Processing...' : 'Run'}
                   </button>
@@ -994,11 +1436,6 @@ function EnrichmentPanel({ data, onDataUpdate }) {
             </div>
           ))}
         </div>
-      </div>
-
-      <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border">
-        <h4 className="font-semibold text-slate-900 dark:text-white mb-4">Upload New Data</h4>
-        <CSVUpload onUpload={onDataUpdate} />
       </div>
     </div>
   )
@@ -1020,12 +1457,12 @@ function exportPDF(elementId, filename = 'report.pdf') {
 }
 
 // Main Dashboard
-function Dashboard({ data, columns, setData, setColumns, user, onLogout }) {
+function Dashboard({ data, columns, setData, setColumns, user, onLogout, onDataUpdate }) {
   const [filters, setFilters] = useState({})
   const [globalSearch, setGlobalSearch] = useState('')
   const [selectedFilter, setSelectedFilter] = useState(null)
   const [dateRange, setDateRange] = useState(null)
-  const [view, setView] = useState(user?.role === 'admin' ? 'admin' : 'overview')
+  const [view, setView] = useState('overview')
   const [dark, setDark] = useDarkMode()
 
   const filteredData = useMemo(() => {
@@ -1120,7 +1557,7 @@ function Dashboard({ data, columns, setData, setColumns, user, onLogout }) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'filtered_calls.csv'
+    a.download = 'callpulse_export.csv'
     a.click()
   }
 
@@ -1136,19 +1573,18 @@ function Dashboard({ data, columns, setData, setColumns, user, onLogout }) {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
-              <h1 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Phone className="w-6 h-6 text-blue-600" /> Call Dashboard
-              </h1>
+              <Logo />
               <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
                 {[
                   { id: 'overview', icon: BarChart3, label: 'Overview' },
                   { id: 'table', icon: Table, label: 'Data' },
                   { id: 'map', icon: Map, label: 'Map' },
-                  { id: 'enrich', icon: Settings, label: 'Enrich' },
+                  { id: 'enrich', icon: Zap, label: 'Enrich' },
+                  { id: 'files', icon: Database, label: 'Data Files' },
                   ...(user?.role === 'admin' ? [{ id: 'admin', icon: Users, label: 'Admin' }] : [])
                 ].map(tab => (
                   <button key={tab.id} onClick={() => setView(tab.id)}
-                    className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1 ${view === tab.id ? 'bg-white dark:bg-slate-600 shadow-sm' : 'hover:bg-white/50'}`}>
+                    className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1 ${view === tab.id ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-indigo-400' : 'hover:bg-white/50 text-slate-600 dark:text-slate-400'}`}>
                     <tab.icon className="w-4 h-4" /> {tab.label}
                   </button>
                 ))}
@@ -1160,7 +1596,7 @@ function Dashboard({ data, columns, setData, setColumns, user, onLogout }) {
                 onSelect={({ field, value }) => { setSelectedFilter({ field, value }); setGlobalSearch('') }} />
               
               {selectedFilter && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-lg text-sm">
                   <span className="font-medium">{selectedFilter.field}:</span> {selectedFilter.value}
                   <button onClick={() => setSelectedFilter(null)}><X className="w-4 h-4" /></button>
                 </div>
@@ -1182,10 +1618,10 @@ function Dashboard({ data, columns, setData, setColumns, user, onLogout }) {
             <DateRangeFilter data={data} onFilter={setDateRange} />
             <SavedFilters filters={filters} globalSearch={globalSearch} dateRange={dateRange} onLoad={loadFilter} onDelete={() => {}} />
             <div className="flex-1" />
-            <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg">
+            <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg">
               <Download className="w-4 h-4" /> Export CSV
             </button>
-            <button onClick={() => exportPDF('dashboard-content', 'call-report.pdf')}
+            <button onClick={() => exportPDF('dashboard-content', 'callpulse-report.pdf')}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg">
               <FileText className="w-4 h-4" /> Export PDF
             </button>
@@ -1213,7 +1649,7 @@ function Dashboard({ data, columns, setData, setColumns, user, onLogout }) {
                     <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#94a3b8" />
                     <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
                     <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }} />
-                    <Area type="monotone" dataKey="count" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} />
+                    <Area type="monotone" dataKey="count" stroke="#6366f1" fill="#6366f1" fillOpacity={0.2} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -1226,7 +1662,7 @@ function Dashboard({ data, columns, setData, setColumns, user, onLogout }) {
                     <XAxis type="number" tick={{ fontSize: 12 }} stroke="#94a3b8" />
                     <YAxis dataKey="state" type="category" tick={{ fontSize: 12 }} stroke="#94a3b8" width={40} />
                     <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }} />
-                    <Bar dataKey="count" fill="#10b981" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="count" fill="#22c55e" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1263,8 +1699,12 @@ function Dashboard({ data, columns, setData, setColumns, user, onLogout }) {
         {view === 'table' && <DataTable data={filteredData} columns={columns} filters={filters} setFilters={setFilters} />}
         {view === 'map' && <MapView data={filteredData} />}
         {view === 'enrich' && <EnrichmentPanel data={filteredData} onDataUpdate={(d, c) => { setData(d); if (c) setColumns(c) }} />}
+        {view === 'files' && <DataFilesPanel onDataUpdate={onDataUpdate} />}
         {view === 'admin' && <AdminPanel currentUser={user} />}
       </main>
+
+      {/* AI Chat Panel */}
+      <AIChatPanel data={filteredData} columns={columns} />
     </div>
   )
 }
@@ -1331,12 +1771,22 @@ export default function App() {
     setColumns([])
   }
 
+  const handleDataUpdate = () => {
+    loadData()
+  }
+
   if (!authenticated) return <LoginScreen onLogin={handleLogin} />
   if (loading) return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
-      <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+      <div className="text-center">
+        <Logo size="lg" />
+        <div className="mt-6">
+          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mx-auto" />
+          <p className="text-slate-500 mt-2">Loading your data...</p>
+        </div>
+      </div>
     </div>
   )
 
-  return <Dashboard data={data} columns={columns} setData={setData} setColumns={setColumns} user={user} onLogout={handleLogout} />
+  return <Dashboard data={data} columns={columns} setData={setData} setColumns={setColumns} user={user} onLogout={handleLogout} onDataUpdate={handleDataUpdate} />
 }

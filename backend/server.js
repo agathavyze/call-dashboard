@@ -6,6 +6,7 @@ const Papa = require('papaparse')
 const crypto = require('crypto')
 const Database = require('better-sqlite3')
 const bcrypt = require('bcryptjs')
+const multer = require('multer')
 
 const app = express()
 app.use(cors())
@@ -18,6 +19,8 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'dashboard.db')
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123'
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'demo123'
 const NODE_ENV = process.env.NODE_ENV || 'development'
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../data')
 
 // Serve static frontend in production
 if (NODE_ENV === 'production') {
@@ -28,6 +31,32 @@ if (NODE_ENV === 'production') {
 // Initialize SQLite database
 const db = new Database(DB_PATH)
 db.pragma('journal_mode = WAL')
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true })
+}
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, DATA_DIR),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+    cb(null, uniqueSuffix + '-' + file.originalname)
+  }
+})
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase()
+    if (['.csv', '.tsv', '.txt'].includes(ext)) {
+      cb(null, true)
+    } else {
+      cb(new Error('Only CSV, TSV, and TXT files allowed'))
+    }
+  }
+})
 
 // Create tables
 db.exec(`
@@ -48,6 +77,40 @@ db.exec(`
     token TEXT UNIQUE NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     expires_at DATETIME NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+  
+  CREATE TABLE IF NOT EXISTS data_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    file_size INTEGER,
+    row_count INTEGER,
+    columns TEXT,
+    date_range_start TEXT,
+    date_range_end TEXT,
+    uploaded_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    active INTEGER DEFAULT 1,
+    FOREIGN KEY (uploaded_by) REFERENCES users(id)
+  );
+  
+  CREATE TABLE IF NOT EXISTS column_mappings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_column TEXT NOT NULL,
+    target_column TEXT NOT NULL,
+    file_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (file_id) REFERENCES data_files(id)
+  );
+  
+  CREATE TABLE IF NOT EXISTS chat_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    response TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 `)
@@ -110,18 +173,118 @@ function requireAdmin(req, res, next) {
   next()
 }
 
-// Load CSV data
+// Load CSV data - now from multiple sources
 let cachedData = null
 let cachedColumns = null
+let dataFilesCache = null
 
-function loadData() {
-  if (cachedData) return { data: cachedData, columns: cachedColumns }
-  const csvContent = fs.readFileSync(DATA_FILE, 'utf-8')
-  const parsed = Papa.parse(csvContent, { header: true, skipEmptyLines: true })
-  cachedData = parsed.data
-  cachedColumns = parsed.meta.fields
-  console.log(`Loaded ${cachedData.length} records with ${cachedColumns.length} columns`)
-  return { data: cachedData, columns: cachedColumns }
+function loadDataFromFile(filePath) {
+  const content = fs.readFileSync(filePath, 'utf-8')
+  // Detect delimiter (TSV vs CSV)
+  const firstLine = content.split('\n')[0] || ''
+  const delimiter = firstLine.includes('\t') ? '\t' : ','
+  const parsed = Papa.parse(content, { header: true, skipEmptyLines: true, delimiter })
+  return { data: parsed.data, columns: parsed.meta.fields || [] }
+}
+
+function loadAllData(forceRefresh = false) {
+  if (cachedData && !forceRefresh) return { data: cachedData, columns: cachedColumns, files: dataFilesCache }
+  
+  // Get all active data files from DB
+  const files = db.prepare('SELECT * FROM data_files WHERE active = 1 ORDER BY created_at ASC').all()
+  
+  // If no files in DB, try loading from default DATA_FILE
+  if (files.length === 0) {
+    try {
+      if (fs.existsSync(DATA_FILE)) {
+        const { data, columns } = loadDataFromFile(DATA_FILE)
+        cachedData = data
+        cachedColumns = columns
+        dataFilesCache = [{ id: 0, original_name: 'Default Data', row_count: data.length, columns: JSON.stringify(columns) }]
+        console.log(`Loaded ${data.length} records from default file`)
+        return { data: cachedData, columns: cachedColumns, files: dataFilesCache }
+      }
+    } catch (err) {
+      console.error('Error loading default data file:', err.message)
+    }
+    cachedData = []
+    cachedColumns = []
+    dataFilesCache = []
+    return { data: [], columns: [], files: [] }
+  }
+  
+  // Merge data from all files
+  let allData = []
+  let allColumns = new Set()
+  
+  for (const file of files) {
+    try {
+      if (fs.existsSync(file.file_path)) {
+        const { data, columns } = loadDataFromFile(file.file_path)
+        columns.forEach(col => allColumns.add(col))
+        // Add source file info to each row
+        data.forEach(row => {
+          row._sourceFile = file.original_name
+          row._sourceFileId = file.id
+        })
+        allData = allData.concat(data)
+      }
+    } catch (err) {
+      console.error(`Error loading ${file.original_name}:`, err.message)
+    }
+  }
+  
+  // Normalize all rows to have all columns
+  const columnsArray = Array.from(allColumns)
+  allData = allData.map(row => {
+    const normalized = {}
+    columnsArray.forEach(col => {
+      normalized[col] = row[col] !== undefined ? row[col] : null
+    })
+    normalized._sourceFile = row._sourceFile
+    normalized._sourceFileId = row._sourceFileId
+    return normalized
+  })
+  
+  cachedData = allData
+  cachedColumns = columnsArray
+  dataFilesCache = files
+  console.log(`Loaded ${allData.length} records from ${files.length} files with ${columnsArray.length} columns`)
+  return { data: cachedData, columns: cachedColumns, files: dataFilesCache }
+}
+
+function invalidateCache() {
+  cachedData = null
+  cachedColumns = null
+  dataFilesCache = null
+}
+
+// Helper to analyze a file and get stats
+function analyzeFile(filePath) {
+  const { data, columns } = loadDataFromFile(filePath)
+  
+  // Try to find date range from common date columns
+  const dateColumns = ['CallStart', 'CallEnd', 'Date', 'Timestamp', 'Created', 'CreatedAt']
+  let dateRangeStart = null
+  let dateRangeEnd = null
+  
+  for (const col of dateColumns) {
+    if (columns.includes(col)) {
+      const dates = data.map(row => row[col]).filter(Boolean).sort()
+      if (dates.length > 0) {
+        dateRangeStart = dates[0]
+        dateRangeEnd = dates[dates.length - 1]
+        break
+      }
+    }
+  }
+  
+  return {
+    rowCount: data.length,
+    columns,
+    dateRangeStart,
+    dateRangeEnd
+  }
 }
 
 // State/timezone/coordinates mappings
@@ -341,12 +504,454 @@ app.delete('/api/admin/users/:id', requireAuth, requireAdmin, (req, res) => {
 
 app.get('/api/data', requireAuth, (req, res) => {
   try {
-    const { data, columns } = loadData()
-    res.json({ data, columns })
+    const { data, columns, files } = loadAllData()
+    res.json({ data, columns, files })
   } catch (err) {
     res.status(500).json({ error: 'Failed to load data' })
   }
 })
+
+// ============== DATA FILE MANAGEMENT ==============
+
+app.get('/api/files', requireAuth, (req, res) => {
+  try {
+    const files = db.prepare(`
+      SELECT df.*, u.username as uploaded_by_name
+      FROM data_files df
+      LEFT JOIN users u ON df.uploaded_by = u.id
+      ORDER BY df.created_at DESC
+    `).all()
+    res.json({ files })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/files/upload', requireAuth, upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' })
+    }
+    
+    const filePath = req.file.path
+    const stats = analyzeFile(filePath)
+    
+    // Check for schema differences with existing data
+    const { columns: existingColumns } = loadAllData()
+    const newColumns = stats.columns.filter(c => !existingColumns.includes(c))
+    const missingColumns = existingColumns.filter(c => !stats.columns.includes(c))
+    
+    // Insert file record
+    const result = db.prepare(`
+      INSERT INTO data_files (filename, original_name, file_path, file_size, row_count, columns, date_range_start, date_range_end, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      req.file.filename,
+      req.file.originalname,
+      filePath,
+      req.file.size,
+      stats.rowCount,
+      JSON.stringify(stats.columns),
+      stats.dateRangeStart,
+      stats.dateRangeEnd,
+      req.user.user_id
+    )
+    
+    // Invalidate cache so next load includes new file
+    invalidateCache()
+    
+    res.json({
+      file: {
+        id: result.lastInsertRowid,
+        filename: req.file.filename,
+        original_name: req.file.originalname,
+        row_count: stats.rowCount,
+        columns: stats.columns,
+        date_range_start: stats.dateRangeStart,
+        date_range_end: stats.dateRangeEnd
+      },
+      schema: {
+        newColumns,
+        missingColumns,
+        hasChanges: newColumns.length > 0 || missingColumns.length > 0
+      }
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.delete('/api/files/:id', requireAuth, requireAdmin, (req, res) => {
+  try {
+    const { id } = req.params
+    const file = db.prepare('SELECT * FROM data_files WHERE id = ?').get(id)
+    
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' })
+    }
+    
+    // Soft delete - just mark as inactive
+    db.prepare('UPDATE data_files SET active = 0 WHERE id = ?').run(id)
+    
+    // Optionally delete the physical file
+    if (req.query.deleteFile === 'true' && fs.existsSync(file.file_path)) {
+      fs.unlinkSync(file.file_path)
+    }
+    
+    invalidateCache()
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.put('/api/files/:id/restore', requireAuth, requireAdmin, (req, res) => {
+  try {
+    const { id } = req.params
+    db.prepare('UPDATE data_files SET active = 1 WHERE id = ?').run(id)
+    invalidateCache()
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.get('/api/files/:id/preview', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params
+    const file = db.prepare('SELECT * FROM data_files WHERE id = ?').get(id)
+    
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' })
+    }
+    
+    const { data, columns } = loadDataFromFile(file.file_path)
+    res.json({
+      file,
+      preview: data.slice(0, 100), // First 100 rows
+      columns,
+      totalRows: data.length
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Get merged schema info
+app.get('/api/schema', requireAuth, (req, res) => {
+  try {
+    const files = db.prepare('SELECT * FROM data_files WHERE active = 1').all()
+    const allColumns = new Set()
+    const columnSources = {}
+    
+    files.forEach(file => {
+      const cols = JSON.parse(file.columns || '[]')
+      cols.forEach(col => {
+        allColumns.add(col)
+        if (!columnSources[col]) columnSources[col] = []
+        columnSources[col].push(file.original_name)
+      })
+    })
+    
+    res.json({
+      columns: Array.from(allColumns),
+      columnSources,
+      fileCount: files.length
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ============== AI CHAT ==============
+
+app.post('/api/chat', requireAuth, async (req, res) => {
+  try {
+    const { message } = req.body
+    
+    if (!message) {
+      return res.status(400).json({ error: 'Message required' })
+    }
+    
+    if (!OPENAI_API_KEY) {
+      return res.status(503).json({ error: 'AI chat not configured. Set OPENAI_API_KEY environment variable.' })
+    }
+    
+    // Load current data for context
+    const { data, columns } = loadAllData()
+    
+    // Build data summary for AI context
+    const dataSummary = buildDataSummary(data, columns)
+    
+    // Build the prompt
+    const systemPrompt = `You are an AI assistant for a call center analytics dashboard called "CallPulse". You help users analyze and understand their call data.
+
+Current data summary:
+${dataSummary}
+
+Available columns: ${columns.join(', ')}
+
+You can help users with:
+1. Filtering and searching data (e.g., "show calls from California", "find calls over 5 minutes")
+2. Statistical analysis (e.g., "what's the average call duration", "busiest time of day")
+3. Caller insights (e.g., "summarize this caller's history", "repeat callers")
+4. Trends and patterns (e.g., "call volume trends", "which states have most calls")
+
+When answering:
+- Be concise but helpful
+- Provide specific numbers when available
+- Suggest related insights when relevant
+- If you need to filter data, explain what filter criteria would help
+- Format numbers nicely (use commas for thousands)
+
+Important: You have access to the actual data. Perform real calculations and provide accurate answers.`
+
+    // Call OpenAI API
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
+      })
+    })
+    
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error?.message || 'OpenAI API error')
+    }
+    
+    const aiResponse = await response.json()
+    const assistantMessage = aiResponse.choices[0]?.message?.content || 'I could not generate a response.'
+    
+    // Extract any suggested filters from the response
+    const suggestedFilters = extractFiltersFromResponse(assistantMessage, columns)
+    
+    // Save to chat history
+    db.prepare('INSERT INTO chat_history (user_id, message, response) VALUES (?, ?, ?)').run(
+      req.user.user_id,
+      message,
+      assistantMessage
+    )
+    
+    res.json({
+      response: assistantMessage,
+      suggestedFilters,
+      dataContext: {
+        totalRecords: data.length,
+        columns: columns.length
+      }
+    })
+  } catch (err) {
+    console.error('Chat error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Advanced AI query that returns actual data
+app.post('/api/chat/query', requireAuth, async (req, res) => {
+  try {
+    const { message } = req.body
+    
+    if (!OPENAI_API_KEY) {
+      return res.status(503).json({ error: 'AI chat not configured' })
+    }
+    
+    const { data, columns } = loadAllData()
+    
+    // Ask AI to generate a filter function
+    const systemPrompt = `You are a data query assistant. Given a natural language query about call data, generate a JavaScript filter function.
+
+Available columns: ${columns.join(', ')}
+
+Sample row: ${JSON.stringify(data[0] || {})}
+
+Respond with ONLY a valid JSON object in this format:
+{
+  "filters": { "column_name": "value_to_match" },
+  "sort": { "column": "column_name", "direction": "asc|desc" },
+  "aggregation": null | { "type": "count|sum|avg|max|min", "column": "column_name", "groupBy": "column_name" },
+  "explanation": "Brief explanation of what you're doing"
+}
+
+Examples:
+- "calls from California" → { "filters": { "CallerState": "CA" }, "explanation": "Filtering calls where state is California" }
+- "longest calls" → { "filters": {}, "sort": { "column": "CallDuration", "direction": "desc" }, "explanation": "Sorting by call duration descending" }
+- "calls per state" → { "aggregation": { "type": "count", "groupBy": "CallerState" }, "explanation": "Counting calls grouped by state" }`
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      })
+    })
+    
+    const aiResponse = await response.json()
+    const content = aiResponse.choices[0]?.message?.content || '{}'
+    
+    // Parse the AI response
+    let querySpec
+    try {
+      // Extract JSON from response (in case there's extra text)
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      querySpec = JSON.parse(jsonMatch ? jsonMatch[0] : content)
+    } catch (e) {
+      return res.json({ error: 'Could not parse query', raw: content })
+    }
+    
+    // Apply the query
+    let result = [...data]
+    
+    // Apply filters
+    if (querySpec.filters) {
+      for (const [col, val] of Object.entries(querySpec.filters)) {
+        if (col && val !== undefined) {
+          const valLower = String(val).toLowerCase()
+          result = result.filter(row => {
+            const rowVal = String(row[col] || '').toLowerCase()
+            return rowVal.includes(valLower) || rowVal === valLower
+          })
+        }
+      }
+    }
+    
+    // Apply sort
+    if (querySpec.sort?.column) {
+      const { column, direction } = querySpec.sort
+      result.sort((a, b) => {
+        const aVal = a[column] || ''
+        const bVal = b[column] || ''
+        const numA = parseFloat(aVal)
+        const numB = parseFloat(bVal)
+        
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return direction === 'desc' ? numB - numA : numA - numB
+        }
+        return direction === 'desc' ? String(bVal).localeCompare(String(aVal)) : String(aVal).localeCompare(String(bVal))
+      })
+    }
+    
+    // Apply aggregation
+    let aggregationResult = null
+    if (querySpec.aggregation) {
+      const { type, column, groupBy } = querySpec.aggregation
+      
+      if (groupBy) {
+        const groups = {}
+        result.forEach(row => {
+          const key = row[groupBy] || 'Unknown'
+          if (!groups[key]) groups[key] = []
+          groups[key].push(row)
+        })
+        
+        aggregationResult = Object.entries(groups).map(([key, rows]) => {
+          let value
+          switch (type) {
+            case 'count': value = rows.length; break
+            case 'sum': value = rows.reduce((s, r) => s + (parseFloat(r[column]) || 0), 0); break
+            case 'avg': value = rows.reduce((s, r) => s + (parseFloat(r[column]) || 0), 0) / rows.length; break
+            case 'max': value = Math.max(...rows.map(r => parseFloat(r[column]) || 0)); break
+            case 'min': value = Math.min(...rows.map(r => parseFloat(r[column]) || 0)); break
+            default: value = rows.length
+          }
+          return { [groupBy]: key, [type]: Math.round(value * 100) / 100 }
+        }).sort((a, b) => b[type] - a[type])
+      }
+    }
+    
+    res.json({
+      query: querySpec,
+      resultCount: result.length,
+      results: result.slice(0, 100), // Limit results
+      aggregation: aggregationResult,
+      explanation: querySpec.explanation
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.get('/api/chat/history', requireAuth, (req, res) => {
+  try {
+    const history = db.prepare(`
+      SELECT * FROM chat_history 
+      WHERE user_id = ? 
+      ORDER BY created_at DESC 
+      LIMIT 50
+    `).all(req.user.user_id)
+    res.json({ history })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Helper functions for AI
+function buildDataSummary(data, columns) {
+  if (data.length === 0) return 'No data loaded.'
+  
+  const summary = []
+  summary.push(`Total records: ${data.length.toLocaleString()}`)
+  
+  // Call outcomes
+  const outcomes = {}
+  data.forEach(r => { outcomes[r.CallAction || 'Unknown'] = (outcomes[r.CallAction || 'Unknown'] || 0) + 1 })
+  summary.push(`Call outcomes: ${Object.entries(outcomes).map(([k, v]) => `${k}: ${v}`).join(', ')}`)
+  
+  // Top states
+  const states = {}
+  data.forEach(r => { if (r.CallerState) states[r.CallerState] = (states[r.CallerState] || 0) + 1 })
+  const topStates = Object.entries(states).sort(([, a], [, b]) => b - a).slice(0, 5)
+  summary.push(`Top states: ${topStates.map(([s, c]) => `${s} (${c})`).join(', ')}`)
+  
+  // Duration stats
+  const durations = data.map(r => parseInt(r.CallDuration) || 0)
+  const avgDuration = Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+  const maxDuration = Math.max(...durations)
+  summary.push(`Call duration: avg ${Math.floor(avgDuration / 60)}m ${avgDuration % 60}s, max ${Math.floor(maxDuration / 60)}m`)
+  
+  // Unique callers
+  const uniqueCallers = new Set(data.map(r => r.CallerID)).size
+  summary.push(`Unique callers: ${uniqueCallers.toLocaleString()}`)
+  
+  // Date range
+  const dates = data.map(r => r.CallStart).filter(Boolean).sort()
+  if (dates.length > 0) {
+    summary.push(`Date range: ${dates[0]} to ${dates[dates.length - 1]}`)
+  }
+  
+  return summary.join('\n')
+}
+
+function extractFiltersFromResponse(response, columns) {
+  const filters = {}
+  const responseLower = response.toLowerCase()
+  
+  // Simple pattern matching for common filter suggestions
+  const stateMatch = responseLower.match(/filter.*state.*[=:]?\s*["']?([A-Z]{2})["']?/i)
+  if (stateMatch && columns.includes('CallerState')) {
+    filters.CallerState = stateMatch[1].toUpperCase()
+  }
+  
+  return Object.keys(filters).length > 0 ? filters : null
+}
 
 // ============== ENRICHMENT ROUTES ==============
 
@@ -690,5 +1295,5 @@ if (NODE_ENV === 'production') {
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT} (${NODE_ENV})`)
-  try { loadData() } catch (err) { console.error('Warning: Could not pre-load data:', err.message) }
+  try { loadAllData() } catch (err) { console.error('Warning: Could not pre-load data:', err.message) }
 })

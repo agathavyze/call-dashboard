@@ -1,7 +1,7 @@
 {
-  "name": "call-dashboard",
-  "version": "1.0.0",
-  "description": "Call data dashboard with analytics",
+  "name": "callpulse",
+  "version": "2.0.0",
+  "description": "CallPulse - Intelligent Call Center Analytics Dashboard with AI insights",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && node server.js",
@@ -12,5 +12,14 @@
   },
   "engines": {
     "node": ">=18"
-  }
+  },
+  "keywords": [
+    "call-center",
+    "analytics",
+    "dashboard",
+    "ai",
+    "crm"
+  ],
+  "author": "",
+  "license": "MIT"
 }
