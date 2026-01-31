@@ -384,6 +384,9 @@ app.post('/api/enrich/geocode', requireAuth, async (req, res) => {
     
     const enrichedData = data.map(row => {
       const newRow = { ...row }
+      // Always add columns so they show in table
+      newRow.Latitude = null
+      newRow.Longitude = null
       const state = row.CallerState
       if (state && stateCoordinates[state]) {
         newRow.Latitude = stateCoordinates[state].lat
@@ -393,8 +396,10 @@ app.post('/api/enrich/geocode', requireAuth, async (req, res) => {
       return newRow
     })
     
+    const allColumns = new Set()
+    enrichedData.forEach(row => Object.keys(row).forEach(k => allColumns.add(k)))
     cachedData = enrichedData
-    cachedColumns = Object.keys(enrichedData[0] || {})
+    cachedColumns = Array.from(allColumns)
     res.json({ data: enrichedData, columns: cachedColumns, message: `Added coordinates for ${enrichedCount} records` })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -408,6 +413,8 @@ app.post('/api/enrich/timezone', requireAuth, async (req, res) => {
     
     const enrichedData = data.map(row => {
       const newRow = { ...row }
+      // Always add column so it shows in table
+      newRow.CallerTimezone = null
       const state = row.CallerState
       if (state && stateTimezones[state]) {
         newRow.CallerTimezone = stateTimezones[state]
@@ -416,8 +423,10 @@ app.post('/api/enrich/timezone', requireAuth, async (req, res) => {
       return newRow
     })
     
+    const allColumns = new Set()
+    enrichedData.forEach(row => Object.keys(row).forEach(k => allColumns.add(k)))
     cachedData = enrichedData
-    cachedColumns = Object.keys(enrichedData[0] || {})
+    cachedColumns = Array.from(allColumns)
     res.json({ data: enrichedData, columns: cachedColumns, message: `Added timezone for ${enrichedCount} records` })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -504,6 +513,10 @@ app.post('/api/enrich/property-links', requireAuth, async (req, res) => {
     const enrichedData = data.map(row => {
       const newRow = { ...row }
       
+      // Always add columns (empty if no data) so they show in table
+      newRow.ZillowLink = null
+      newRow.CountyAssessorLink = null
+      
       // Add Zillow link if address exists
       const hasAddress = row.CallerAddress && row.CallerAddress !== 'Not Found'
       if (hasAddress) {
@@ -524,8 +537,12 @@ app.post('/api/enrich/property-links', requireAuth, async (req, res) => {
       return newRow
     })
     
+    // Get all unique columns across all rows
+    const allColumns = new Set()
+    enrichedData.forEach(row => Object.keys(row).forEach(k => allColumns.add(k)))
+    
     cachedData = enrichedData
-    cachedColumns = Object.keys(enrichedData[0] || {})
+    cachedColumns = Array.from(allColumns)
     res.json({ 
       data: enrichedData, 
       columns: cachedColumns, 
@@ -613,6 +630,12 @@ app.post('/api/enrich/property-tax', requireAuth, async (req, res) => {
     const enrichedData = data.map(row => {
       const newRow = { ...row }
       
+      // Always add columns (empty if no data) so they show in table
+      newRow.CallerCounty = newRow.CallerCounty || null
+      newRow.PropertyTaxRate = null
+      newRow.CountyAssessedValue = null
+      newRow.TaxDataYear = null
+      
       // Only enrich CA callers
       if (row.CallerState !== 'CA') return newRow
       
@@ -636,8 +659,12 @@ app.post('/api/enrich/property-tax', requireAuth, async (req, res) => {
       return newRow
     })
     
+    // Get all unique columns across all rows
+    const allColumns = new Set()
+    enrichedData.forEach(row => Object.keys(row).forEach(k => allColumns.add(k)))
+    
     cachedData = enrichedData
-    cachedColumns = Object.keys(enrichedData[0] || {})
+    cachedColumns = Array.from(allColumns)
     res.json({ 
       data: enrichedData, 
       columns: cachedColumns, 
