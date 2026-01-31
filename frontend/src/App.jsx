@@ -10,7 +10,7 @@ import {
   Users, PhoneCall, PhoneMissed, ChevronDown,
   ChevronUp, X, Lock, Eye, EyeOff, BarChart3, Table, Settings,
   Map, Calendar, Save, FileText, Sun, Moon, Loader2, CheckCircle,
-  AlertCircle, Bookmark, Trash2
+  AlertCircle, Bookmark, Trash2, Building2
 } from 'lucide-react'
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
 import { format, parse, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
@@ -946,6 +946,7 @@ function EnrichmentPanel({ data, onDataUpdate }) {
     { id: 'carrier', title: 'Carrier Lookup', desc: 'Identify phone carriers', icon: Phone },
     { id: 'geocode', title: 'Geocoding', desc: 'Add lat/lng from location', icon: MapPin },
     { id: 'timezone', title: 'Timezone', desc: 'Add timezone from state', icon: Clock },
+    { id: 'property-tax', title: 'CA Property Tax', desc: 'Add county & tax rates (CA only)', icon: Building2 },
   ]
 
   return (

@@ -410,6 +410,118 @@ app.post('/api/enrich/timezone', requireAuth, async (req, res) => {
   }
 })
 
+// ============== CA BOE DATA CACHE ==============
+
+let boeDataCache = {
+  cityToCounty: null,
+  countyTaxRates: null,
+  lastFetched: null
+}
+
+async function fetchBOEData() {
+  // Return cache if less than 24 hours old
+  if (boeDataCache.lastFetched && (Date.now() - boeDataCache.lastFetched) < 24 * 60 * 60 * 1000) {
+    return boeDataCache
+  }
+
+  console.log('Fetching CA BOE data...')
+  
+  try {
+    // Fetch city-to-county mapping (get latest year)
+    const cityRes = await fetch('https://boe.ca.gov/DataPortal/api/odata/Assessed_Property_Values_by_City?$orderby=AssessmentYearTo%20desc&$top=5000')
+    const cityData = await cityRes.json()
+    
+    // Build city-to-county map (use latest year for each city)
+    const cityToCounty = {}
+    const cityValues = {}
+    for (const row of cityData.value) {
+      const cityKey = row.City.toUpperCase()
+      if (!cityToCounty[cityKey]) {
+        cityToCounty[cityKey] = row.County
+        cityValues[cityKey] = row.LocallyAssessedValue
+      }
+    }
+    
+    // Fetch county tax rates (get latest year)
+    const taxRes = await fetch('https://boe.ca.gov/DataPortal/api/odata/Property_Tax_Allocations?$orderby=AssessmentYearTo%20desc&$top=200')
+    const taxData = await taxRes.json()
+    
+    // Build county tax rate map
+    const countyTaxRates = {}
+    for (const row of taxData.value) {
+      const countyKey = row.County.toUpperCase()
+      if (!countyTaxRates[countyKey]) {
+        countyTaxRates[countyKey] = {
+          avgTaxRate: row.AverageTaxRate,
+          netAssessedValue: row.NetTaxableAssessedValue,
+          totalLevies: row.TotalPropertyTaxAllocationsandLevies,
+          year: `${row.AssessmentYearFrom}-${row.AssessmentYearTo}`
+        }
+      }
+    }
+    
+    boeDataCache = {
+      cityToCounty,
+      cityValues,
+      countyTaxRates,
+      lastFetched: Date.now()
+    }
+    
+    console.log(`Cached ${Object.keys(cityToCounty).length} cities, ${Object.keys(countyTaxRates).length} counties`)
+    return boeDataCache
+    
+  } catch (err) {
+    console.error('Failed to fetch BOE data:', err.message)
+    throw err
+  }
+}
+
+app.post('/api/enrich/property-tax', requireAuth, async (req, res) => {
+  try {
+    const { data } = req.body
+    
+    // Fetch/use cached BOE data
+    const boeData = await fetchBOEData()
+    
+    let enrichedCount = 0
+    const enrichedData = data.map(row => {
+      const newRow = { ...row }
+      
+      // Only enrich CA callers
+      if (row.CallerState !== 'CA') return newRow
+      
+      const city = (row.CallerCity || '').toUpperCase()
+      const county = boeData.cityToCounty[city]
+      
+      if (county) {
+        newRow.CallerCounty = county
+        
+        const countyKey = county.toUpperCase()
+        const taxInfo = boeData.countyTaxRates[countyKey]
+        
+        if (taxInfo) {
+          newRow.PropertyTaxRate = taxInfo.avgTaxRate
+          newRow.CountyAssessedValue = taxInfo.netAssessedValue
+          newRow.TaxDataYear = taxInfo.year
+          enrichedCount++
+        }
+      }
+      
+      return newRow
+    })
+    
+    cachedData = enrichedData
+    cachedColumns = Object.keys(enrichedData[0] || {})
+    res.json({ 
+      data: enrichedData, 
+      columns: cachedColumns, 
+      message: `Added CA property tax data for ${enrichedCount} records (CA callers only)` 
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
