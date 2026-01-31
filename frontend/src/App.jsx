@@ -920,6 +920,7 @@ function AdminPanel({ currentUser }) {
 function EnrichmentPanel({ data, onDataUpdate }) {
   const [loading, setLoading] = useState({})
   const [results, setResults] = useState({})
+  const token = localStorage.getItem('auth_token')
 
   const runEnrichment = async (type) => {
     setLoading(prev => ({ ...prev, [type]: true }))
@@ -928,7 +929,7 @@ function EnrichmentPanel({ data, onDataUpdate }) {
     try {
       const res = await fetch(`/api/enrich/${type}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ data })
       })
       const result = await res.json()
