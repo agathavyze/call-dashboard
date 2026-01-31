@@ -10,7 +10,7 @@ import {
   Users, PhoneCall, PhoneMissed, ChevronDown,
   ChevronUp, X, Lock, Eye, EyeOff, BarChart3, Table, Settings,
   Map, Calendar, Save, FileText, Sun, Moon, Loader2, CheckCircle,
-  AlertCircle, Bookmark, Trash2, Building2
+  AlertCircle, Bookmark, Trash2, Building2, ExternalLink
 } from 'lucide-react'
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
 import { format, parse, isWithinInterval, startOfDay, endOfDay } from 'date-fns'
@@ -433,9 +433,19 @@ function DataTable({ data, columns, filters, setFilters }) {
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
               {paginatedData.map((row, i) => (
                 <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                  {columns.map(col => (
-                    <td key={col} className="px-4 py-3 text-slate-700 dark:text-slate-300 whitespace-nowrap">{row[col] || '-'}</td>
-                  ))}
+                  {columns.map(col => {
+                    const val = row[col]
+                    const isLink = val && (col.includes('Link') || col.includes('URL')) && val.startsWith('http')
+                    return (
+                      <td key={col} className="px-4 py-3 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        {isLink ? (
+                          <a href={val} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
+                            Open <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (val || '-')}
+                      </td>
+                    )
+                  })}
                 </tr>
               ))}
             </tbody>
@@ -947,6 +957,7 @@ function EnrichmentPanel({ data, onDataUpdate }) {
     { id: 'geocode', title: 'Geocoding', desc: 'Add lat/lng from location', icon: MapPin },
     { id: 'timezone', title: 'Timezone', desc: 'Add timezone from state', icon: Clock },
     { id: 'property-tax', title: 'CA Property Tax', desc: 'Add county & tax rates (CA only)', icon: Building2 },
+    { id: 'property-links', title: 'Property Links', desc: 'Zillow + County Assessor URLs', icon: ExternalLink },
   ]
 
   return (

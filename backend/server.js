@@ -424,6 +424,118 @@ app.post('/api/enrich/timezone', requireAuth, async (req, res) => {
   }
 })
 
+// ============== CA COUNTY ASSESSOR URLS ==============
+
+const caCountyAssessors = {
+  'Alameda': 'https://www.acgov.org/assessor/search/',
+  'Alpine': 'https://www.alpinecountyca.gov/192/Assessor',
+  'Amador': 'https://www.amadorgov.org/government/assessor',
+  'Butte': 'https://www.buttecounty.net/assessor',
+  'Calaveras': 'https://assessor.calaverasgov.us/',
+  'Colusa': 'https://www.countyofcolusa.org/148/Assessor',
+  'Contra Costa': 'https://www.contracosta.ca.gov/191/Assessor',
+  'Del Norte': 'https://www.dnco.org/departments/assessor/',
+  'El Dorado': 'https://www.edcgov.us/Government/Assessor',
+  'Fresno': 'https://www.fresnocountyca.gov/Departments/Assessor-Recorder',
+  'Glenn': 'https://www.countyofglenn.net/dept/assessor',
+  'Humboldt': 'https://humboldtgov.org/186/Assessor',
+  'Imperial': 'https://assessor.imperialcounty.org/',
+  'Inyo': 'https://www.inyocounty.us/services/assessor',
+  'Kern': 'https://assessor.kerncounty.com/',
+  'Kings': 'https://www.countyofkings.com/departments/finance/assessor',
+  'Lake': 'https://www.lakecountyca.gov/Government/Directory/Assessor_Recorder.htm',
+  'Lassen': 'https://www.lassencounty.org/dept/assessor/assessor.htm',
+  'Los Angeles': 'https://portal.assessor.lacounty.gov/',
+  'Madera': 'https://www.maderacounty.com/government/assessor',
+  'Marin': 'https://www.marincounty.org/depts/ar',
+  'Mariposa': 'https://www.mariposacounty.org/167/Assessor-Recorder',
+  'Mendocino': 'https://www.mendocinocounty.org/government/assessor-county-clerk-recorder',
+  'Merced': 'https://www.co.merced.ca.us/96/Assessor',
+  'Modoc': 'https://www.modoccounty.us/assessor/',
+  'Mono': 'https://monocounty.ca.gov/assessor',
+  'Monterey': 'https://www.co.monterey.ca.us/government/departments-a-h/assessor',
+  'Napa': 'https://www.countyofnapa.org/197/Assessor',
+  'Nevada': 'https://www.mynevadacounty.com/188/Assessor',
+  'Orange': 'https://www.ocassessor.gov/',
+  'Placer': 'https://www.placer.ca.gov/1573/Assessor',
+  'Plumas': 'https://www.plumascounty.us/138/Assessor',
+  'Riverside': 'https://www.asrclkrec.com/',
+  'Sacramento': 'https://assessor.saccounty.gov/',
+  'San Benito': 'https://www.cosb.us/departments/assessor',
+  'San Bernardino': 'https://www.sbcounty.gov/assessor/',
+  'San Diego': 'https://arcc.sdcounty.ca.gov/',
+  'San Francisco': 'https://sfassessor.org/',
+  'San Joaquin': 'https://www.sjgov.org/department/assessor',
+  'San Luis Obispo': 'https://www.slocounty.ca.gov/Departments/Assessor.aspx',
+  'San Mateo': 'https://www.smcacre.org/',
+  'Santa Barbara': 'https://www.countyofsb.org/505/Assessor',
+  'Santa Clara': 'https://www.sccassessor.org/',
+  'Santa Cruz': 'https://www.co.santa-cruz.ca.us/Departments/AssessorHome.aspx',
+  'Shasta': 'https://www.shastacounty.gov/assessor',
+  'Sierra': 'https://www.sierracounty.ca.gov/149/Assessor',
+  'Siskiyou': 'https://www.co.siskiyou.ca.us/assessor',
+  'Solano': 'https://www.solanocounty.com/depts/assessor/',
+  'Sonoma': 'https://sonomacounty.ca.gov/administrative-support-and-fiscal-services/clerk-recorder-assessor-registrar-of-voters',
+  'Stanislaus': 'https://www.stancounty.com/assessor/',
+  'Sutter': 'https://www.suttercounty.org/government/county-departments/assessor',
+  'Tehama': 'https://www.tehamacountyca.gov/government/assessor',
+  'Trinity': 'https://www.trinitycounty.org/Assessor',
+  'Tulare': 'https://tularecounty.ca.gov/assessor/',
+  'Tuolumne': 'https://www.tuolumnecounty.ca.gov/175/Assessor',
+  'Ventura': 'https://assessor.countyofventura.org/',
+  'Yolo': 'https://www.yolocounty.org/government/general-government-departments/assessor',
+  'Yuba': 'https://www.yuba.org/departments/assessor/'
+}
+
+function buildZillowUrl(address, city, state, zip) {
+  if (!address || address === 'Not Found') return null
+  const query = encodeURIComponent(`${address}, ${city}, ${state} ${zip}`.trim())
+  return `https://www.zillow.com/homes/${query}_rb/`
+}
+
+app.post('/api/enrich/property-links', requireAuth, async (req, res) => {
+  try {
+    const { data } = req.body
+    
+    // Need county data for assessor links
+    const boeData = await fetchBOEData()
+    
+    let enrichedCount = 0
+    const enrichedData = data.map(row => {
+      const newRow = { ...row }
+      
+      // Add Zillow link if address exists
+      const hasAddress = row.CallerAddress && row.CallerAddress !== 'Not Found'
+      if (hasAddress) {
+        newRow.ZillowLink = buildZillowUrl(row.CallerAddress, row.CallerCity, row.CallerState, row.CallerZip)
+        enrichedCount++
+      }
+      
+      // Add County Assessor link for CA callers
+      if (row.CallerState === 'CA') {
+        const city = (row.CallerCity || '').toUpperCase()
+        const county = row.CallerCounty || boeData.cityToCounty[city]
+        if (county && caCountyAssessors[county]) {
+          newRow.CallerCounty = county
+          newRow.CountyAssessorLink = caCountyAssessors[county]
+        }
+      }
+      
+      return newRow
+    })
+    
+    cachedData = enrichedData
+    cachedColumns = Object.keys(enrichedData[0] || {})
+    res.json({ 
+      data: enrichedData, 
+      columns: cachedColumns, 
+      message: `Added property links for ${enrichedCount} records with addresses` 
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ============== CA BOE DATA CACHE ==============
 
 let boeDataCache = {
