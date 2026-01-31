@@ -1,0 +1,16 @@
+{
+  "name": "call-dashboard",
+  "version": "1.0.0",
+  "description": "Call data dashboard with analytics",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && node server.js",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "cd backend && node server.js",
+    "postinstall": "cd frontend && npm install && npm run build && cd ../backend && npm install"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
